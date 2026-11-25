@@ -471,5 +471,29 @@ describe('lib/projects/watch', () => {
         commands.project.watch.debug.fileAlreadyQueued(heldFile)
       );
     });
+
+    it('should queue a build when more uploads are outstanding than the queue concurrency', async () => {
+      const finishUploads: Array<() => void> = [];
+      mockedUploadFileToBuild.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finishUploads.push(() =>
+              resolve({} as Awaited<ReturnType<typeof uploadFileToBuild>>)
+            );
+          })
+      );
+
+      for (let i = 0; i < 11; i++) {
+        await watcherHandlers.add(path.join(SOURCE_DIR, `file${i}.json`));
+      }
+      await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+      finishUploads.splice(0).forEach(finish => finish());
+      await vi.advanceTimersByTimeAsync(0);
+      finishUploads.splice(0).forEach(finish => finish());
+      await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+
+      expect(mockedUploadFileToBuild).toHaveBeenCalledTimes(11);
+      expect(mockedQueueBuild).toHaveBeenCalled();
+    });
   });
 });
