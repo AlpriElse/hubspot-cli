@@ -94,7 +94,9 @@ function debounceQueueBuild(
     try {
       uiLogger.debug(commands.project.watch.debug.pause);
       queue.pause();
-      await queue.onIdle();
+      while (queue.pending > 0) {
+        await new Promise(resolve => queue.once('next', resolve));
+      }
 
       try {
         await queueBuild(accountId, projectName, platformVersion);
